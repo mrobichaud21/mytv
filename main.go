@@ -1,16 +1,32 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/sirupsen/logrus"
-	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"k8s.io/apimachinery/pkg/version"
 )
 
+type Configuration struct {
+	Log struct {
+		Level string `yaml:"level"`
+	} `yaml:"log"`
+	Playlist struct {
+		URL interface{} `yaml:"url"`
+	} `yaml:"playlist"`
+	Filters []struct {
+		GroupTitle string `yaml:"group-title"`
+		Channels   []struct {
+			Channel string `yaml:"channel"`
+		} `yaml:"channels"`
+	} `yaml:"filters"`
+}
+
 var (
-	namespace = "telly"
+	namespace = "mytv"
 	log       = &logrus.Logger{
 		Out: os.Stderr,
 		Formatter: &logrus.TextFormatter{
@@ -23,65 +39,93 @@ var (
 
 func main() {
 
-	// Web flags
-	flag.Parse()
+	viper.SetConfigName("mytv.config") // name of config file (without extension)
+	viper.SetConfigType("yaml")        // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/etc/mytv/")
+	viper.AddConfigPath("$HOME/.mytv")
+	viper.AddConfigPath(".")
+	viper.SetEnvPrefix(namespace)
+	viper.AutomaticEnv()
 
-	if flag.Lookup("config.file").Changed {
-		viper.SetConfigFile(flag.Lookup("config.file").Value.String())
-	} else {
-		viper.SetConfigName("telly.config")
-		viper.AddConfigPath("/etc/telly/")
-		viper.AddConfigPath("$HOME/.telly")
-		viper.AddConfigPath(".")
-		viper.SetEnvPrefix(namespace)
-		viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.WithError(err).Panicln("fatal error while reading config file:")
-		}
+	var config Configuration
+	if err := viper.Unmarshal(&config); err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	level, parseLevelErr := logrus.ParseLevel(viper.GetString("log.level"))
+	level, parseLevelErr := logrus.ParseLevel(config.Log.Level)
 	if parseLevelErr != nil {
 		log.WithError(parseLevelErr).Panicln("error setting log level!")
 	}
+
 	log.SetLevel(level)
 
-	log.Infoln("telly is preparing to go live", version.Info())
+	playlist, err := getPlaylist(config.Playlist.URL.(string))
 
-	validateConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	//file, err := m3uplus.Decode(playlist)
+	scanner := bufio.NewScanner(playlist)
+	// optionally, resize scanner's capacity for lines over 64K, see next example
+	filterChannels := []string{}
+	lines := ""
+
+	for scanner.Scan() {
+
+		lineText := scanner.Text()
+		//fmt.Println(lineText)
+
+		if strings.HasPrefix(lineText, "#EXTINF") && strings.Contains(lineText, "group-title=\"US| ENTERTAINMENT HD/4K\"") {
+			lines = lineText
+		} else {
+			if len(lines) > 0 {
+				filterChannels = append(filterChannels, lines+" url=\""+lineText+"\"")
+				lines = ""
+			}
+		}
+
+	}
+
+	fmt.Printf("Total channels = %d", len(filterChannels))
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	for i, s := range filterChannels {
+		fmt.Println(i, s)
+	}
+
+	// rawPlaylist, err := m3uplus.Decode(playlist)
+	// if err != nil {
+	// 	log.WithError(err).Errorln("unable to parse m3u file")
+	// 	panic(err)
+	// }
+
+	// fmt.Print(len(rawPlaylist.Tracks))
+	// playlist.Close()
+
 }
 
-func validateConfig() {
-	// if viper.IsSet("filter.regexstr") {
-	// 	if _, regexErr := regexp.Compile(viper.GetString("filter.regex")); regexErr != nil {
-	// 		log.WithError(regexErr).Panicln("Error when compiling regex, is it valid?")
-	// 	}
-	// }
+func extractChannelName(line string, key string) string {
+	var ch string
 
-	// if !(viper.IsSet("source")) {
-	// 	log.Warnln("There is no source element in the configuration, the config file is likely missing.")
-	// }
-
-	// var addrErr error
-	// if _, addrErr = net.ResolveTCPAddr("tcp", viper.GetString("web.listenaddress")); addrErr != nil {
-	// 	log.WithError(addrErr).Panic("Error when parsing Listen address, please check the address and try again.")
-	// 	return
-	// }
-
-	// if _, addrErr = net.ResolveTCPAddr("tcp", viper.GetString("web.base-address")); addrErr != nil {
-	// 	log.WithError(addrErr).Panic("Error when parsing Base addresses, please check the address and try again.")
-	// 	return
-	// }
-
-	// if getTCPAddr("web.base-address").IP.IsUnspecified() {
-	// 	log.Panicln("base URL is set to 0.0.0.0, this will not work. please use the --web.baseaddress option and set it to the (local) ip address telly is running on.")
-	// }
-
-	// if getTCPAddr("web.listenaddress").IP.IsUnspecified() && getTCPAddr("web.base-address").IP.IsLoopback() {
-	// 	log.Warnln("You are listening on all interfaces but your base URL is localhost (meaning Plex will try and load localhost to access your streams) - is this intended?")
-	// }
+	if strings.Contains(line, key+"=\"") {
+		ch = strings.SplitN(strings.SplitN(line, key+"=\"", 2)[1], "\" ", 2)[0]
+		// } else if strings.Contains(line, "tvg-name=") {
+		// 	ch = strings.SplitN(strings.SplitN(line, "tvg-name=", 2)[1], " tvg", 2)[0]
+	} else {
+		ch = strings.TrimSpace(strings.SplitN(line, ",", 2)[1])
+	}
+	if ch == "" {
+		ch = "No Name"
+	}
+	ch = strings.ReplaceAll(ch, "\"", "")
+	return ch
 }
