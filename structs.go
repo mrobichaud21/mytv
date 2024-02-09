@@ -32,18 +32,49 @@ type hdHomeRunLineupItem struct {
 	// providerChannel providers.ProviderChannel
 }
 
-func newHDHRItem() hdHomeRunLineupItem {
+func newHDHRItem(guideName string, guideNumber int, isFavorite bool, isHd bool) hdHomeRunLineupItem {
 	return hdHomeRunLineupItem{
 		DRM:         convertibleBoolean(false),
-		GuideName:   "name", //providerChannel.Name,
-		GuideNumber: 1000,   //providerChannel.Number,
-		Favorite:    true,   //convertibleBoolean(providerChannel.Favorite),
-		HD:          true,   //convertibleBoolean(providerChannel.HD),
+		GuideName:   guideName,
+		GuideNumber: guideNumber,
+		Favorite:    true, //convertibleBoolean(providerChannel.Favorite),
+		HD:          true, //convertibleBoolean(providerChannel.HD),
 		//
-		URL: fmt.Sprintf("http://%s/auto/v%d", viper.GetString("web.base-address"), 1),
+		URL: fmt.Sprintf("http://%s/auto/v%d", viper.GetString("web.base-address"), guideNumber),
 		//provider:        *provider,
 		//providerChannel: *providerChannel,
 	}
+}
+
+func newProviderChannel(groupTitle string, tvgName string, tvgId string, tvgLogo string, channelName string, channelNumber int) ProviderChannel {
+	return ProviderChannel{
+		GroupTitle:    groupTitle,
+		TvgName:       tvgName,
+		TvgId:         tvgId,
+		TvgLogo:       tvgLogo,
+		ChannelName:   channelName,
+		ChannelNumber: channelNumber,
+		StreamID:      channelNumber,
+	}
+}
+
+type ProviderChannel struct {
+	GroupTitle    string
+	TvgName       string
+	TvgId         string
+	TvgLogo       string
+	ChannelName   string
+	ChannelNumber int
+	StreamID      int // Should be the integer just before .ts.
+	//	Number        int
+	//	Logo          string
+	StreamURL string
+	HD        bool
+	//	Quality       string
+	//	OnDemand      bool
+	//	StreamFormat  string
+	Favorite bool
+	// EPGMatch      string
 }
 
 // DiscoveryData contains data about telly to expose in the HDHomeRun format for Plex detection.

@@ -120,7 +120,7 @@ func serveLineup(lineup *lineup) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Infof("Server Lineup Request URI %s", c.Request.RequestURI)
 		channels := make([]hdHomeRunLineupItem, 0)
-		for _, channel := range lineup.channels {
+		for _, channel := range lineup.hdchannels {
 			channels = append(channels, channel)
 		}
 		sort.Slice(channels, func(i, j int) bool {
@@ -147,14 +147,19 @@ func stream(lineup *lineup) gin.HandlerFunc {
 			return
 		}
 
-		if channel, ok := lineup.channels[channelID]; ok {
-			channelURI := channel.providerChannel.Track.URI
+		if channel, ok := lineup.hdchannels[channelID]; ok {
+
+			fmt.Println(channel)
+			//channelURI := channel.providerChannel.Track.URI
+			//channelURI url.URL
+			channelURI := "https://tbd.com"
 
 			log.Infof("Serving channel number %d", channelID)
 			log.Infof("Request URI %s", c.Request.RequestURI)
 
 			log.Debugf("Redirecting caller to %s", channelURI)
-			c.Redirect(http.StatusMovedPermanently, channelURI.String())
+			//c.Redirect(http.StatusMovedPermanently, channelURI.String())
+			c.Redirect(http.StatusMovedPermanently, channelURI)
 			return
 
 		}
