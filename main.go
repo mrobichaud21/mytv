@@ -1,29 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
-
-type Configuration struct {
-	Log struct {
-		Level string `yaml:"level"`
-	} `yaml:"log"`
-	Playlist struct {
-		URL interface{} `yaml:"url"`
-	} `yaml:"playlist"`
-	Filters []struct {
-		GroupTitle string `yaml:"group-title"`
-		Channels   []struct {
-			Channel string `yaml:"channel"`
-		} `yaml:"channels"`
-	} `yaml:"filters"`
-}
 
 var (
 	namespace = "mytv"
@@ -64,68 +47,8 @@ func main() {
 
 	log.SetLevel(level)
 
-	playlist, err := getPlaylist(config.Playlist.URL.(string))
+	lineup := newLineup(config)
+	log.Printf("%v", lineup.Sources[0].GroupTitle)
+	lineup.Scan()
 
-	if err != nil {
-		panic(err)
-	}
-
-	//file, err := m3uplus.Decode(playlist)
-	scanner := bufio.NewScanner(playlist)
-	// optionally, resize scanner's capacity for lines over 64K, see next example
-	filterChannels := []string{}
-	lines := ""
-
-	for scanner.Scan() {
-
-		lineText := scanner.Text()
-		//fmt.Println(lineText)
-
-		if strings.HasPrefix(lineText, "#EXTINF") && strings.Contains(lineText, "group-title=\"US| ENTERTAINMENT HD/4K\"") {
-			lines = lineText
-		} else {
-			if len(lines) > 0 {
-				filterChannels = append(filterChannels, lines+" url=\""+lineText+"\"")
-				lines = ""
-			}
-		}
-
-	}
-
-	fmt.Printf("Total channels = %d", len(filterChannels))
-
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-	}
-
-	for i, s := range filterChannels {
-		fmt.Println(i, s)
-	}
-
-	// rawPlaylist, err := m3uplus.Decode(playlist)
-	// if err != nil {
-	// 	log.WithError(err).Errorln("unable to parse m3u file")
-	// 	panic(err)
-	// }
-
-	// fmt.Print(len(rawPlaylist.Tracks))
-	// playlist.Close()
-
-}
-
-func extractChannelName(line string, key string) string {
-	var ch string
-
-	if strings.Contains(line, key+"=\"") {
-		ch = strings.SplitN(strings.SplitN(line, key+"=\"", 2)[1], "\" ", 2)[0]
-		// } else if strings.Contains(line, "tvg-name=") {
-		// 	ch = strings.SplitN(strings.SplitN(line, "tvg-name=", 2)[1], " tvg", 2)[0]
-	} else {
-		ch = strings.TrimSpace(strings.SplitN(line, ",", 2)[1])
-	}
-	if ch == "" {
-		ch = "No Name"
-	}
-	ch = strings.ReplaceAll(ch, "\"", "")
-	return ch
 }
