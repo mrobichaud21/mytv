@@ -19,7 +19,7 @@ import (
 )
 
 func serve(lineup *lineup) {
-	discoveryData := getDiscoveryData()
+	discoveryData := lineup.GetDiscoveryData()
 
 	log.Debugln("creating device xml")
 	log.Debugf("Lineup : %v", lineup)
@@ -38,6 +38,15 @@ func serve(lineup *lineup) {
 	if viper.GetBool("log.logrequests") {
 		router.Use(ginrus())
 	}
+
+	// https://stackoverflow.com/questions/57354389/how-to-render-static-files-within-gin-router
+	// http://192.168.4.31:6077/data/us_entertainment_hd4k.m3u8
+	// http://192.168.4.31:6077/data/us_movies_hd4k.m3u8
+	// http://192.168.4.31:6077/data/us_sport_hd4k.m3u8
+
+	router.Static("/data", "./.cache")
+	//router.StaticFS("/more_static", http.Dir("my_file_system"))
+	//router.StaticFile("/favicon.ico", "./resources/favicon.ico")
 
 	router.GET("/", deviceXML(upnp))
 	router.GET("/discover.json", discovery(discoveryData))
@@ -88,11 +97,11 @@ func serve(lineup *lineup) {
 	router.StaticFS("/manage", box)
 
 	log.Infof("telly is live and on the air!")
-	log.Infof("Broadcasting from http://%s/", viper.GetString("web.base-address"))
-	log.Infof("EPG URL: http://%s/epg.xml", viper.GetString("web.base-address"))
-	log.Infof("Lineup JSON: http://%s/lineup.json", viper.GetString("web.base-address"))
+	log.Infof("Broadcasting from http://%s:%d", lineup.Discovery.BaseAdress, lineup.Discovery.ServicePort)
+	log.Infof("EPG URL: http://%s:%d/epg.xml", lineup.Discovery.BaseAdress, lineup.Discovery.ServicePort)
+	log.Infof("Lineup JSON: http://%s:%d/lineup.json", lineup.Discovery.BaseAdress, lineup.Discovery.ServicePort)
 
-	if err := router.Run(viper.GetString("web.listen-address")); err != nil {
+	if err := router.Run(fmt.Sprintf("%s:%d", lineup.Discovery.BaseAdress, lineup.Discovery.ServicePort)); err != nil {
 		log.WithError(err).Panicln("Error starting up web server")
 	}
 }
@@ -120,7 +129,7 @@ func serveLineup(lineup *lineup) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Infof("Server Lineup Request URI %s", c.Request.RequestURI)
 		channels := make([]hdHomeRunLineupItem, 0)
-		for _, channel := range lineup.hdchannels {
+		for _, channel := range lineup.HDChannels {
 			channels = append(channels, channel)
 		}
 		sort.Slice(channels, func(i, j int) bool {
@@ -141,18 +150,21 @@ func serveLineup(lineup *lineup) gin.HandlerFunc {
 func stream(lineup *lineup) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		channelIDStr := c.Param("channelID")[1:]
+		//channelIDStr := c.Param("channelID")
 		channelID, channelIDErr := strconv.Atoi(channelIDStr)
 		if channelIDErr != nil {
 			c.AbortWithError(http.StatusBadRequest, fmt.Errorf("that (%s) doesn't appear to be a valid channel number", channelIDStr))
 			return
 		}
 
-		if channel, ok := lineup.hdchannels[channelID]; ok {
+		//if channel, ok := lineup.HDChannels[channelID]; ok {
+		if channel, ok := lineup.providerChannel[channelID]; ok {
 
 			fmt.Println(channel)
+
 			//channelURI := channel.providerChannel.Track.URI
 			//channelURI url.URL
-			channelURI := "https://tbd.com"
+			channelURI := lineup.providerChannel[channelID].StreamURL
 
 			log.Infof("Serving channel number %d", channelID)
 			log.Infof("Request URI %s", c.Request.RequestURI)

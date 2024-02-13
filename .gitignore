@@ -1,4 +1,7 @@
 main
-cache.m3u8
+obiwalker.com
+*cache.m3u8
+.cache
 mytv.config.yaml
 US|*
+__debug**

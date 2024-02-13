@@ -5,8 +5,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"regexp"
-
-	"github.com/spf13/viper"
 )
 
 // var channelNumberRegex = regexp.MustCompile(`^[0-9]+[[:space:]]?$`).MatchString
@@ -23,7 +21,7 @@ type hdHomeRunLineupItem struct {
 	DRM         convertibleBoolean `xml:",omitempty" json:",string,omitempty"`
 	Favorite    convertibleBoolean `xml:",omitempty" json:",string,omitempty"`
 	GuideName   string             `xml:",omitempty" json:",omitempty"`
-	GuideNumber int                `xml:",omitempty" json:",string,omitempty"`
+	GuideNumber string             `xml:",omitempty" json:",string,omitempty"`
 	HD          convertibleBoolean `xml:",omitempty" json:",string,omitempty"`
 	URL         string             `xml:",omitempty" json:",omitempty"`
 	VideoCodec  string             `xml:",omitempty" json:",omitempty"`
@@ -32,15 +30,16 @@ type hdHomeRunLineupItem struct {
 	// providerChannel providers.ProviderChannel
 }
 
-func newHDHRItem(guideName string, guideNumber int, isFavorite bool, isHd bool) hdHomeRunLineupItem {
+func newHDHRItem(providerChannel ProviderChannel, discovery Discovery) hdHomeRunLineupItem {
 	return hdHomeRunLineupItem{
 		DRM:         convertibleBoolean(false),
-		GuideName:   guideName,
-		GuideNumber: guideNumber,
+		GuideName:   providerChannel.TvgName,
+		GuideNumber: fmt.Sprintf("v%d", providerChannel.ChannelNumber),
 		Favorite:    true, //convertibleBoolean(providerChannel.Favorite),
 		HD:          true, //convertibleBoolean(providerChannel.HD),
 		//
-		URL: fmt.Sprintf("http://%s/auto/v%d", viper.GetString("web.base-address"), guideNumber),
+		//URL: fmt.Sprintf("http://%s:%d/auto/v%d", discovery.BaseAdress, discovery.ServicePort, providerChannel.ChannelNumber),
+		URL: providerChannel.StreamURL,
 		//provider:        *provider,
 		//providerChannel: *providerChannel,
 	}

@@ -2,6 +2,7 @@ package main
 
 // https://zhwt.github.io/yaml-to-go/
 // https://github.com/go-yaml/yaml/issues/165
+
 type Configuration struct {
 	Log struct {
 		Level string `yaml:"level"`
@@ -18,6 +19,7 @@ type Configuration struct {
 type Filter struct {
 	GroupTitle string    `yaml:"groupTitle"`
 	Channels   []Channel `yaml:"channels"`
+	rawFile    string
 }
 
 type Channel struct {
@@ -37,6 +39,7 @@ type Discovery struct {
 	IptvStreams     int    `yaml:"iptvStreams"`
 	DeviceAuth      string `yaml:"deviceAuth"`
 	BaseAdress      string `yaml:"baseAdress"`
+	ServicePort     int    `yaml:"servicePort"`
 }
 
 func (s *Discovery) UnmarshalYAML(unmarshal func(interface{}) error) error {

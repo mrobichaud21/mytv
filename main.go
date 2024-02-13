@@ -48,7 +48,7 @@ func main() {
 	log.SetLevel(level)
 
 	lineup := newLineup(config)
-	log.Printf("%v", lineup.Sources[0].GroupTitle)
 	lineup.Scan()
+	serve(lineup)
 
 }
